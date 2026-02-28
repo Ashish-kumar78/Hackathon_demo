@@ -37,7 +37,7 @@ const State = {
    ══════════════════════════════════════════════ */
 const API_CONFIG = {
     // 🔑 Paste your free Alpha Vantage key here → https://www.alphavantage.co/support/#api-key
-    KEY: '51SRKXZ79LFSGXUI',
+    KEY: 'YOUR_API_KEY_HERE',
     BASE: 'https://www.alphavantage.co/query',
     // Map our symbol names to Alpha Vantage BSE symbols
     SYMBOL_MAP: {
@@ -58,8 +58,7 @@ const API_CACHE = {};
  * Returns { labels: [], prices: [] } or null on error.
  */
 async function fetchAlphaVantage(symbol, timeframe) {
-    const avSymbol = API_CONFIG.SYMBOL_MAP[symbol] || symbol + '.BSE';
-    const cacheKey = `${avSymbol}_${timeframe}`;
+    const cacheKey = `${symbol}_${timeframe}`;
 
     // Return cached data if it's less than 5 minutes old
     if (API_CACHE[cacheKey] && Date.now() - API_CACHE[cacheKey].ts < 5 * 60 * 1000) {
@@ -67,45 +66,33 @@ async function fetchAlphaVantage(symbol, timeframe) {
     }
 
     try {
-        let url, seriesKey, count;
-        if (timeframe === '1D') {
-            url = `${API_CONFIG.BASE}?function=TIME_SERIES_INTRADAY&symbol=${avSymbol}&interval=5min&apikey=${API_CONFIG.KEY}`;
-            seriesKey = 'Time Series (5min)';
-            count = 20;
-        } else if (timeframe === '1W') {
-            url = `${API_CONFIG.BASE}?function=TIME_SERIES_DAILY&symbol=${avSymbol}&apikey=${API_CONFIG.KEY}`;
-            seriesKey = 'Time Series (Daily)';
-            count = 7;
-        } else if (timeframe === '1M') {
-            url = `${API_CONFIG.BASE}?function=TIME_SERIES_DAILY&symbol=${avSymbol}&apikey=${API_CONFIG.KEY}`;
-            seriesKey = 'Time Series (Daily)';
-            count = 30;
-        } else {
-            url = `${API_CONFIG.BASE}?function=TIME_SERIES_WEEKLY&symbol=${avSymbol}&apikey=${API_CONFIG.KEY}`;
-            seriesKey = 'Weekly Time Series';
-            count = timeframe === '3M' ? 13 : 52;
-        }
-
+        const url = `http://127.0.0.1:8000/api/market/chart?symbol=${symbol}&timeframe=${timeframe}`;
         const res = await fetch(url);
-        const json = await res.json();
 
-        if (json['Note'] || json['Information']) {
-            console.warn('Alpha Vantage rate limit hit — using mock data');
+        if (!res.ok) {
+            console.warn('Real market data limit/error — jumping to fallback');
             return null;
         }
 
-        const series = json[seriesKey];
-        if (!series) return null;
+        const json = await res.json();
 
-        const entries = Object.entries(series).slice(0, count).reverse();
-        const labels = entries.map(([t]) => timeframe === '1D' ? t.split(' ')[1].slice(0, 5) : t.slice(5));
-        const prices = entries.map(([, v]) => parseFloat(v['4. close']));
+        // json has {labels, prices, opens, highs, lows, closes}
+        const result = {
+            labels: json.labels,
+            prices: json.prices,
+            ohlc: json.labels.map((l, i) => ({
+                x: l,
+                o: json.opens[i],
+                h: json.highs[i],
+                l: json.lows[i],
+                c: json.closes[i]
+            }))
+        };
 
-        const result = { labels, prices };
         API_CACHE[cacheKey] = { data: result, ts: Date.now() };
         return result;
     } catch (err) {
-        console.error('Alpha Vantage fetch error:', err);
+        console.error('Market fetch error:', err);
         return null;
     }
 }
@@ -202,7 +189,47 @@ function bootApp() {
     loadNewsItems();
     loadSentimentStocks();
     renderJournal();
+    // Pre-initialize market quotes for real values
+    updateLiveTicker();
     showToast(`Welcome back, ${State.user}! 🚀`, 'success');
+}
+
+/**
+ * Handle Buy/Sell orders from the main chart
+ */
+function handleTrade(type) {
+    const symbol = currentStock;
+    const price = STOCK_DATA[symbol]?.price || 0;
+    const qty = 1; // Default for hackathon demo
+
+    if (type === 'buy') {
+        const existing = State.holdings.find(h => h.symbol === symbol);
+        if (existing) {
+            existing.avgPrice = +((existing.avgPrice * existing.qty + price * qty) / (existing.qty + qty)).toFixed(2);
+            existing.qty += qty;
+        } else {
+            State.holdings.push({
+                symbol,
+                company: symbol === 'RELIANCE' ? 'Reliance Ind.' : symbol,
+                sector: 'Market',
+                qty,
+                avgPrice: price,
+                cmp: price
+            });
+        }
+        showToast(`✅ Bought ${qty} share of ${symbol} at ₹${price}`, 'success');
+    } else {
+        const idx = State.holdings.findIndex(h => h.symbol === symbol);
+        if (idx === -1 || State.holdings[idx].qty < qty) {
+            showToast(`❌ Insufficient holdings of ${symbol} to sell`, 'error');
+            return;
+        }
+        State.holdings[idx].qty -= qty;
+        if (State.holdings[idx].qty === 0) State.holdings.splice(idx, 1);
+        showToast(`📉 Sold ${qty} share of ${symbol} at ₹${price}`, 'success');
+    }
+    renderHoldings();
+    refreshPortfolioKPIs();
 }
 
 /* ══════════════════════════════════════════════
@@ -233,6 +260,7 @@ function switchTab(name) {
    DASHBOARD – MAIN CHART
    ══════════════════════════════════════════════ */
 const STOCK_DATA = {
+    'BTC-USD': { price: 61000, change: '+500', pct: '+0.80%', dir: 'positive', data: [60000, 60500, 60200, 60800, 61000] },
     RELIANCE: { price: 2890, change: '+52.20', pct: '+1.84%', dir: 'positive', data: [2650, 2680, 2710, 2740, 2700, 2760, 2810, 2840, 2890, 2870, 2890] },
     TCS: { price: 3621, change: '-18.50', pct: '-0.51%', dir: 'negative', data: [3700, 3720, 3690, 3680, 3710, 3695, 3660, 3640, 3630, 3625, 3621] },
     INFY: { price: 1543, change: '+13.80', pct: '+0.90%', dir: 'positive', data: [1480, 1495, 1510, 1520, 1505, 1515, 1528, 1535, 1542, 1540, 1543] },
@@ -249,7 +277,7 @@ const LABELS_MAP = {
     '1Y': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
 };
 
-let currentStock = 'RELIANCE';
+let currentStock = 'BTC-USD';
 
 function initDashboard() {
     drawRiskGauge('Moderate');
@@ -433,33 +461,41 @@ async function buildMainChart(type) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    // ── Try Alpha Vantage API if key is set ──
-    let realLabels = null, realPrices = null;
-    if (API_CONFIG.KEY && API_CONFIG.KEY !== 'YOUR_KEY' && type !== 'candlestick') {
-        showToast('📡 Fetching live data…', 'info');
-        const apiData = await fetchAlphaVantage(currentStock, State.activeTimeframe);
-        if (apiData && apiData.prices.length > 0) {
-            realLabels = apiData.labels;
-            realPrices = apiData.prices;
-            // Update price info from real data
-            const lastPrice = realPrices[realPrices.length - 1];
-            const prevPrice = realPrices[realPrices.length - 2] || lastPrice;
-            const change = (lastPrice - prevPrice).toFixed(2);
-            const pct = ((lastPrice - prevPrice) / prevPrice * 100).toFixed(2);
-            const dir = change >= 0 ? 'positive' : 'negative';
-            document.getElementById('chart-price').textContent = '₹' + lastPrice.toLocaleString('en-IN');
-            const el = document.getElementById('chart-change');
-            el.textContent = (dir === 'positive' ? '▲ +' : '▼ ') + change + ' (' + pct + '%)';
-            el.className = 'chart-price-change ' + dir;
-            showToast('✅ Live data loaded for ' + currentStock, 'success');
-        } else {
-            showToast('⚠️ Using mock data (API limit or error)', 'info');
-        }
+    // ── Try Backend Market API ──
+    let realLabels = null, realPrices = null, realOhlc = null;
+    showToast('📡 Fetching live data…', 'info');
+    const apiData = await fetchAlphaVantage(currentStock, State.activeTimeframe);
+    if (apiData && apiData.prices && apiData.prices.length > 0) {
+        realLabels = apiData.labels;
+        realPrices = apiData.prices;
+        realOhlc = apiData.ohlc;
+        // Update price info from real data
+        const lastPrice = realPrices[realPrices.length - 1];
+        const prevPrice = realPrices[realPrices.length - 2] || lastPrice;
+        const change = (lastPrice - prevPrice).toFixed(2);
+        const pct = ((lastPrice - prevPrice) / prevPrice * 100).toFixed(2);
+        const dir = change >= 0 ? 'positive' : 'negative';
+        document.getElementById('chart-price').textContent = '₹' + lastPrice.toLocaleString('en-IN');
+        const el = document.getElementById('chart-change');
+        el.textContent = (dir === 'positive' ? '▲ +' : '▼ ') + change + ' (' + pct + '%)';
+        el.className = 'chart-price-change ' + dir;
+        showToast('✅ Live data loaded for ' + currentStock, 'success');
+    } else {
+        showToast('⚠️ Using mock data (API error or limit)', 'info');
     }
 
     if (type === 'candlestick') {
-        const ohlcData = generateOHLC(STOCK_DATA[currentStock], State.activeTimeframe);
-        const labels = LABELS_MAP[State.activeTimeframe] || LABELS_MAP['1D'];
+        let ohlcData;
+        let labels;
+        // Try real API data first if we have it
+        if (realLabels && realOhlc) {
+            labels = realLabels;
+            ohlcData = realOhlc;
+        } else {
+            ohlcData = generateOHLC(STOCK_DATA[currentStock], State.activeTimeframe);
+            labels = LABELS_MAP[State.activeTimeframe] || LABELS_MAP['1D'];
+        }
+
         State.charts.main = new Chart(ctx, {
             type: 'candlestick',
             data: {
@@ -502,7 +538,7 @@ async function buildMainChart(type) {
         State.charts.main = new Chart(ctx, {
             type: type === 'bar' ? 'bar' : 'line',
             data: { labels: realLabels, datasets },
-            options: buildChartOptions(),
+            options: buildChartOptions(realLabels, realPrices),
         });
     } else {
         // ── Mock data fallback ──
@@ -620,14 +656,18 @@ function initPortfolioCharts() {
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#8892a4', font: { size: 11 }, padding: 10 } } }, cutout: '65%' },
     });
 
-    // Performance Line
+    // Performance Line (Dynamic)
+    const totalNow = State.holdings.reduce((s, h) => s + h.qty * h.cmp, 0);
+    // Simulate back historical line data to make it look like a real chart
+    const dynData = [0.80, 0.82, 0.79, 0.85, 0.88, 0.86, 0.90, 0.94, 0.96, 0.98, 0.99, 1.0].map(m => Math.round(totalNow * m));
+
     State.charts.perfChart = new Chart(document.getElementById('portfolio-perf-chart'), {
         type: 'line',
         data: {
             labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
             datasets: [{
                 label: 'Portfolio Value',
-                data: [140000, 145000, 138000, 152000, 158000, 155000, 162000, 168000, 172000, 176000, 180000, 184250],
+                data: dynData,
                 borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.1)',
                 fill: true, tension: 0.4, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4,
             }],
@@ -880,12 +920,17 @@ async function loadNewsItems(filter = 'all') {
     // Try backend first
     if (BACKEND_ONLINE && filter === 'all') {
         try {
-            feed.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary)">📡 Fetching live news…</div>';
+            const isInitial = feed.innerHTML.includes('Fetching');
+            if (isInitial) {
+                feed.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary)">📡 Fetching live news…</div>';
+            }
+
             const q = document.getElementById('news-query-input')?.value || 'India stock market finance';
             const resp = await API.getNews(q, 10);
+
             if (resp && resp.articles && resp.articles.length > 0) {
-                // Store in State for filter reuse
-                State.newsData = resp.articles.map((a, idx) => ({
+                const oldTitles = State.newsData.map(n => n.title);
+                const newNews = resp.articles.map((a, idx) => ({
                     id: idx + 1,
                     title: a.title,
                     source: a.source,
@@ -895,16 +940,31 @@ async function loadNewsItems(filter = 'all') {
                     sentimentScore: a.sentiment_score,
                     summary: a.summary,
                     stock: 'MARKET',
-                    impact: Math.abs(a.sentiment_score) > 0.5 ? 'high' : 'medium',
+                    impact: Math.abs(a.sentiment_score) > 0.6 ? 'high' : 'medium',
                 }));
+
+                // Check for new high-impact news for alert
+                if (!isInitial) {
+                    newNews.forEach(news => {
+                        if (news.impact === 'high' && !oldTitles.includes(news.title)) {
+                            triggerNewsAlert(news);
+                        }
+                    });
+                }
+
+                State.newsData = newNews;
                 renderNewsFeed(filter);
+
                 // Update sentiment gauge
                 const overallMap = { positive: 70, neutral: 50, negative: 30 };
                 const pct = overallMap[resp.overall_sentiment] || 50;
                 const gaugeEl = document.getElementById('sent-gauge-fill');
                 const valEl = document.getElementById('sent-gauge-val');
                 if (gaugeEl) gaugeEl.style.width = pct + '%';
-                if (valEl) { valEl.textContent = pct + '% ' + resp.overall_sentiment.charAt(0).toUpperCase() + resp.overall_sentiment.slice(1); valEl.className = resp.overall_sentiment === 'positive' ? 'positive' : 'negative'; }
+                if (valEl) {
+                    valEl.textContent = pct + '% ' + resp.overall_sentiment.charAt(0).toUpperCase() + resp.overall_sentiment.slice(1);
+                    valEl.className = resp.overall_sentiment === 'positive' ? 'positive' : 'negative';
+                }
                 return;
             }
         } catch (e) {
@@ -913,6 +973,19 @@ async function loadNewsItems(filter = 'all') {
     }
 
     renderNewsFeed(filter);
+
+    // Update charts dynamically with the loaded loaded data
+    if (State.charts.sentDonut) {
+        let pos = 0, neg = 0, neu = 0;
+        State.newsData.forEach(n => {
+            if (n.sentiment === 'positive') pos++;
+            else if (n.sentiment === 'negative') neg++;
+            else neu++;
+        });
+        const total = pos + neg + neu || 1;
+        State.charts.sentDonut.data.datasets[0].data = [pos / total * 100, neg / total * 100, neu / total * 100];
+        State.charts.sentDonut.update();
+    }
 }
 
 function renderNewsFeed(filter = 'all') {
@@ -982,7 +1055,7 @@ function initSentimentChart() {
         },
     });
 
-    new Chart(document.getElementById('sentiment-donut'), {
+    State.charts.sentDonut = new Chart(document.getElementById('sentiment-donut'), {
         type: 'doughnut',
         data: { labels: ['Bullish', 'Bearish', 'Neutral'], datasets: [{ data: [62, 23, 15], backgroundColor: ['#00ff99', '#ef4444', '#f59e0b'], borderWidth: 2, borderColor: '#13161f' }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#8892a4', font: { size: 10 }, padding: 8 } } }, cutout: '60%' },
@@ -1006,27 +1079,46 @@ function refreshFlowPanel() {
     document.querySelector('.flow-node:nth-child(5) .flow-val').textContent = '₹' + total.toLocaleString('en-IN');
 }
 
-function generateFullStrategy() {
-    const strategies = [
-        { icon: '⚠️', title: 'Rebalance Volatile Holdings', desc: 'Current IT sector exposure at 47% exceeds your risk profile threshold of 30%. Reduce INFY/WIPRO by 15%.', tag: 'REBALANCE', impact: 'High Impact', cls: 'high-priority' },
-        { icon: '📈', title: 'Opportunity: TATAMOTORS Uptrend', desc: 'EV momentum + 88% AI confidence signals strong upside. Consider increasing allocation by 5–8%.', tag: 'BUY', impact: 'Medium Impact', cls: 'medium-priority' },
-        { icon: '🛡️', title: 'Add Defensive Exposure (FMCG/Pharma)', desc: 'Adding Sun Pharma or HUL at 10% allocation improves diversification score from 72 → 87.', tag: 'DIVERSIFY', impact: 'Low Risk', cls: 'low-priority' },
-        { icon: '🔴', title: 'Set Stop-Loss on WIPRO', desc: 'WIPRO at -1.2% with bearish sentiment (score: 28). Place stop-loss at ₹430 to limit downside.', tag: 'STOP-LOSS', impact: 'Risk Control', cls: 'high-priority' },
-    ];
+async function generateFullStrategy() {
     const out = document.getElementById('strategy-output');
-    out.innerHTML = strategies.map(s => `
-    <div class="strategy-card ${s.cls}">
-      <div class="strategy-icon">${s.icon}</div>
+    out.innerHTML = `
+    <div style="text-align:center;padding:40px;color:var(--text-secondary)">
+      <div class="ai-loader" style="margin:0 auto 15px">
+        <div class="loader-ring"></div>
+      </div>
+      <p>🤖 AI is analyzing your portfolio, news, and risk profile…</p>
+    </div>`;
+
+    let adviceText = "";
+    if (BACKEND_ONLINE) {
+        try {
+            const query = `Analyze my portfolio for ${State.riskProfile} risk profile. I hold ${State.holdings.map(h => h.symbol).join(', ')}. Give me 3 actionable strategies.`;
+            const resp = await API.askAdvisor(State.user?.id || 0, query);
+            adviceText = resp.advice;
+        } catch (e) {
+            console.error('Advisor API error:', e);
+            adviceText = "Strategy generation failed. Please try again later.";
+        }
+    } else {
+        // Fallback mock
+        adviceText = "REBALANCE: Your IT exposure is high. BUY: TATAMOTORS looks bullish. DIVERSIFY: Add FMCG exposure.";
+    }
+
+    // Parse the adviceText into cards if possible, or just show as one big card
+    // For the hackathon, we'll format the LLM response beautifully
+    out.innerHTML = `
+    <div class="strategy-card high-priority">
+      <div class="strategy-icon">🧠</div>
       <div class="strategy-content">
-        <h4>${s.title}</h4>
-        <p>${s.desc}</p>
-        <div class="strategy-action">
-          <span class="action-tag">${s.tag}</span>
-          <span class="action-impact">${s.impact}</span>
+        <h4>MindVest AI Intelligence</h4>
+        <div style="line-height:1.6; color:var(--text-primary); margin-top:10px; white-space:pre-wrap;">${adviceText}</div>
+        <div class="strategy-action" style="margin-top:15px">
+          <span class="action-tag">ACTIONABLE</span>
+          <span class="action-impact">Personalized</span>
         </div>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+
     document.getElementById('strategy-time').textContent = 'Updated ' + new Date().toLocaleTimeString();
     showToast('🧠 AI Strategy regenerated!', 'success');
 }
@@ -1581,10 +1673,82 @@ function showToast(msg, type = 'info') {
     toastTimer = setTimeout(() => { t.classList.remove('show'); }, 3400);
 }
 
+function triggerNewsAlert(news) {
+    showToast(`🚨 HIGH IMPACT: ${news.title}`, news.sentiment === 'negative' ? 'error' : 'success');
+
+    // Drastic Event Alert System inline within News Module
+    let alertContainer = document.getElementById('news-drastic-alert-container');
+    if (alertContainer) {
+        const alertBanner = document.createElement('div');
+        const colorBg = news.sentiment === 'negative' ? 'rgba(239,68,68,0.1)' : 'rgba(0,255,153,0.1)';
+        const colorBorder = news.sentiment === 'negative' ? '#ef4444' : '#00ff99';
+        alertBanner.style.background = colorBg;
+        alertBanner.style.padding = '16px 20px';
+        alertBanner.style.borderRadius = '8px';
+        alertBanner.style.border = `1px solid ${colorBorder}`;
+        alertBanner.style.display = 'flex';
+        alertBanner.style.alignItems = 'center';
+        alertBanner.style.justifyContent = 'space-between';
+        alertBanner.style.marginBottom = '12px';
+        alertBanner.innerHTML = `
+            <div style="display:flex;align-items:center;gap:16px;">
+                <div style="font-size:24px;">${news.sentiment === 'negative' ? '📉' : '🚀'}</div>
+                <div>
+                    <strong style="font-size:16px;color:${colorBorder}">🚨 DRASTIC EVENT ALERT</strong>
+                    <div style="font-size:14px;margin-top:4px;color:var(--text-primary)">${news.title}</div>
+                    <div style="font-size:12px;margin-top:4px;color:var(--text-secondary)">Predicted Market Impact: High</div>
+                </div>
+            </div>
+            <button onclick="this.parentElement.remove()" style="background:transparent;border:none;color:var(--text-secondary);font-size:20px;cursor:pointer;">&times;</button>
+        `;
+        // Prepend so newest is on top if multiple alerts fire
+        alertContainer.prepend(alertBanner);
+
+        // Auto-remove inline alert after 30 seconds
+        setTimeout(() => {
+            if (alertBanner.parentElement) alertBanner.remove();
+        }, 30000);
+    }
+
+    // Play notification sound (Modern subtle ping)
+    const playPing = () => {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gn = ctx.createGain();
+            osc.connect(gn);
+            gn.connect(ctx.destination);
+            osc.frequency.setValueAtTime(523, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
+            gn.gain.setValueAtTime(0, ctx.currentTime);
+            gn.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.05);
+            gn.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.4);
+        } catch (e) { }
+    };
+    playPing();
+    if (news.impact === 'high') setTimeout(playPing, 200);
+
+    // Desktop Notification if permitted
+    if (Notification.permission === "granted") {
+        new Notification("MindVest High Impact Alert", { body: news.title, icon: "⚡" });
+    }
+}
+
 /* ══════════════════════════════════════════════
    INIT ON LOAD
    ══════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', () => {
+    // Auto-refresh news every 60 seconds
+    setInterval(() => {
+        if (BACKEND_ONLINE) loadNewsItems('all');
+    }, 60000);
+
+    // Request Notification Permissions
+    if (Notification.permission !== "denied") {
+        Notification.requestPermission();
+    }
     const savedToken = localStorage.getItem('mindvest_token');
     const savedUser = localStorage.getItem('mindvest_user');
     if (savedToken && savedUser) {
@@ -1593,14 +1757,224 @@ document.addEventListener('DOMContentLoaded', () => {
         bootApp();
     }
 
-    // Ticker animation — live price simulation
-    setInterval(() => {
-        document.querySelectorAll('.ticker-item').forEach(el => {
-            const valEl = el.querySelector('.ticker-val');
-            if (!valEl) return;
-            const change = (Math.random() - 0.5) * 0.3;
-            const isPos = Math.random() > 0.4;
-            el.className = 'ticker-item ' + (isPos ? 'positive' : 'negative');
+    // Live Ticker using real Market API
+    async function updateLiveTicker() {
+        try {
+            const res = await fetch('http://127.0.0.1:8000/api/market/quotes');
+            if (!res.ok) return;
+            const data = await res.json();
+
+            // Map the returned data to the ticker elements
+            // Expected backend format: {"RELIANCE": {"price": 2890.5, "change": 15.2, "pct": 0.5, "dir": "positive"}, ...}
+
+            // Rebuild the ticker HTML
+            const tickerContainer = document.getElementById('market-ticker');
+            if (!tickerContainer) return;
+
+            let html = '';
+            for (const [symbol, info] of Object.entries(data)) {
+                const sign = info.dir === 'positive' ? '▲' : '▼';
+                const charColorClass = info.dir;
+                html += `
+                    <div class="ticker-item ${charColorClass}">
+                        ${symbol} <span class="ticker-val">₹${info.price.toLocaleString('en-IN')} 
+                        <span class="tick-chg">${sign} ${info.pct}%</span></span>
+                    </div>
+                `;
+            }
+            // Add a few hardcoded benchmark indexes since yfinance NSE is slow for NIFTY
+            html = `
+                <div class="ticker-item positive">NIFTY 50 <span class="ticker-val">22,147 &nbsp; <span class="tick-chg">▲ 1.2%</span></span></div>
+                <div class="ticker-item negative">SENSEX <span class="ticker-val">73,180 &nbsp; <span class="tick-chg">▼ 0.3%</span></span></div>
+            ` + html;
+
+            tickerContainer.innerHTML = html;
+
+            // Update individual watchlist prices if they exist in DOM
+            Object.entries(data).forEach(([sy, info]) => {
+                // Update Watchlist UI
+                document.querySelectorAll('.watch-item').forEach(el => {
+                    const symbolEl = el.querySelector('.watch-symbol');
+                    if (symbolEl && symbolEl.textContent === sy) {
+                        const priceEl = el.querySelector('.watch-price');
+                        if (priceEl) {
+                            const signStr = info.dir === 'positive' ? '+' : '';
+                            priceEl.className = `watch-price ${info.dir}`;
+                            priceEl.innerHTML = `<span>${info.price.toLocaleString('en-IN')}</span><span class="watch-chg">${signStr}${info.pct}%</span>`;
+                        }
+                    }
+                });
+
+                // Update STOCK_DATA cache
+                if (STOCK_DATA[sy]) {
+                    STOCK_DATA[sy].price = info.price;
+                    STOCK_DATA[sy].change = info.change;
+                    STOCK_DATA[sy].pct = info.pct + '%';
+                    STOCK_DATA[sy].dir = info.dir;
+                }
+
+                // ⚡ CRITICAL: Update the Main Chart Price if this is the active stock
+                if (sy === currentStock) {
+                    const mainPriceEl = document.getElementById('chart-price');
+                    const mainChgEl = document.getElementById('chart-change');
+                    if (mainPriceEl) {
+                        const oldPrice = parseFloat(mainPriceEl.textContent.replace(/[₹,]/g, ''));
+                        mainPriceEl.textContent = '₹' + info.price.toLocaleString('en-IN');
+
+                        // Flash color on change
+                        if (info.price !== oldPrice) {
+                            mainPriceEl.style.color = info.price > oldPrice ? '#00ff99' : '#ef4444';
+                            setTimeout(() => mainPriceEl.style.color = '', 800);
+                        }
+                    }
+                    if (mainChgEl) {
+                        const sign = info.dir === 'positive' ? '▲ +' : '▼ ';
+                        mainChgEl.textContent = `${sign} ${info.change} (${info.pct}%)`;
+                        mainChgEl.className = 'chart-price-change ' + info.dir;
+                    }
+
+                    // Fluctuate the graph according to real value
+                    if (State.charts.main && State.charts.main.data.datasets.length > 0) {
+                        const ds = State.charts.main.data.datasets[0];
+                        if (State.chartType === 'candlestick') {
+                            const lastCdl = ds.data[ds.data.length - 1];
+                            if (lastCdl) {
+                                lastCdl.c = info.price;
+                                lastCdl.h = Math.max(lastCdl.h, info.price);
+                                lastCdl.l = Math.min(lastCdl.l, info.price);
+                            }
+                        } else {
+                            if (ds.data.length > 0) {
+                                ds.data[ds.data.length - 1] = info.price;
+                            }
+                        }
+                        State.charts.main.update('none'); // Update without full animation
+                    }
+                }
+            });
+
+        } catch (e) {
+            console.error('Ticker fetch error', e);
+        }
+    }
+
+    // Initial fetch
+    updateLiveTicker();
+
+    // Refresh real quotes every 10 seconds
+    setInterval(updateLiveTicker, 10000);
+
+    // High-frequency refresh for ACTIVE stock to make chart feel super real
+    setInterval(async () => {
+        if (!currentStock || !BACKEND_ONLINE) return;
+        try {
+            const res = await fetch(`http://127.0.0.1:8000/api/market/quotes?symbols=${currentStock}.NS`);
+            if (!res.ok) return;
+            const data = await res.json();
+            const info = data[currentStock];
+            if (info) {
+                STOCK_DATA[currentStock].price = info.price;
+                STOCK_DATA[currentStock].change = info.change;
+                STOCK_DATA[currentStock].pct = info.pct + '%';
+                STOCK_DATA[currentStock].dir = info.dir;
+            }
+        } catch (e) { }
+    }, 5000);
+
+    // ── Finnhub WebSocket for Ultra Real-time Ticker Fluctuations ──
+    const finnhubSocket = new WebSocket('wss://ws.finnhub.io?token=d6gcl11r01qt4932dik0d6gcl11r01qt4932dikg');
+    finnhubSocket.addEventListener('open', function (event) {
+        ['AAPL', 'MSFT', 'TSLA', 'NVDA', 'AMZN', 'GOOGL'].forEach(sym => {
+            finnhubSocket.send(JSON.stringify({ 'type': 'subscribe', 'symbol': sym }))
         });
-    }, 3000);
+    });
+    finnhubSocket.addEventListener('message', function (event) {
+        try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'trade' && msg.data) {
+                msg.data.forEach(trade => {
+                    const sy = trade.s;
+                    const price = trade.p;
+                    // Flash watchlist
+                    document.querySelectorAll('.watch-item').forEach(el => {
+                        const symbolEl = el.querySelector('.watch-symbol');
+                        if (symbolEl && symbolEl.textContent === sy) {
+                            const priceSpan = el.querySelector('.watch-price > span:first-child');
+                            if (priceSpan) {
+                                priceSpan.textContent = price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                el.style.backgroundColor = 'rgba(0, 255, 153, 0.1)';
+                                setTimeout(() => el.style.backgroundColor = '', 300);
+                            }
+                        }
+                    });
+                    // Update main chart price if matching
+                    if (window.currentStock === sy) {
+                        const chartPrice = document.getElementById('chart-price');
+                        if (chartPrice) {
+                            chartPrice.textContent = price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        }
+                    }
+                });
+            }
+        } catch (e) { }
+    });
 });
+
+/* ── AI Assistant Chatbot Functions ── */
+function toggleChatbot() {
+    const chat = document.getElementById('ai-chatbot');
+    if (chat) chat.classList.toggle('closed');
+}
+
+async function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    appendMessage('user', msg);
+    input.value = '';
+
+    // Show typing indicator
+    const typingId = 'typing-' + Date.now();
+    appendMessage('bot', '...', typingId);
+
+    // If backend was thought to be offline, try one last time
+    if (!BACKEND_ONLINE) {
+        try {
+            await API.ping();
+            BACKEND_ONLINE = true;
+        } catch (e) { }
+    }
+
+    if (BACKEND_ONLINE) {
+        try {
+            const resp = await API.chat(msg, State.user?.id || 0);
+            removeMessage(typingId);
+            appendMessage('bot', resp.reply);
+        } catch (e) {
+            removeMessage(typingId);
+            appendMessage('bot', "I'm sorry, I'm having trouble connecting to my brain right now. Please try again later!");
+        }
+    } else {
+        setTimeout(() => {
+            removeMessage(typingId);
+            appendMessage('bot', "I'm currently in demo mode. Connect the backend to chat with my real AI!");
+        }, 800);
+    }
+}
+
+function appendMessage(type, text, id = null) {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+    const div = document.createElement('div');
+    div.className = `msg ${type}`;
+    if (id) div.id = id;
+    div.textContent = text;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+function removeMessage(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+}

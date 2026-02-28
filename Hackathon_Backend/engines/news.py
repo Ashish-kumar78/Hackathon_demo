@@ -6,25 +6,61 @@ import httpx
 from typing import List
 from models.schemas import NewsRequest, NewsArticle, NewsResponse
 from core.config import settings
+from datetime import datetime, timezone
 
 
 # ─── NewsAPI ──────────────────────────────────────────────────────────────────
 
 async def fetch_news_articles(query: str, limit: int = 10) -> List[dict]:
-    """Fetch news articles from NewsAPI."""
-    url = "https://newsapi.org/v2/everything"
-    params = {
-        "q": query,
-        "pageSize": limit,
-        "sortBy": "publishedAt",
-        "language": "en",
-        "apiKey": settings.NEWS_API_KEY,
-    }
+    """Fetch real-time news articles from NewsData.io using the API key."""
+    if settings.NEWS_API_KEY:
+        # User provided API key starts with 'pub_', meaning it's NewsData.io, not NewsAPI.org
+        url = "https://newsdata.io/api/1/news"
+        params = {
+            "apikey": settings.NEWS_API_KEY,
+            "q": query,
+            "language": "en",
+            "size": limit,
+        }
+        
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(url, params=params, timeout=10)
+                response.raise_for_status()
+                data = response.json()
+                
+                # Transform NewsData.io format back to the unified format
+                results = data.get("results", [])
+                articles = []
+                for n in results:
+                    articles.append({
+                        "title": n.get("title", ""),
+                        "description": n.get("description", ""),
+                        "url": n.get("link", ""),
+                        "publishedAt": n.get("pubDate", ""),
+                        "source": {"name": n.get("source_id", "NewsData")}
+                    })
+                if articles:
+                    return articles
+            except Exception as e:
+                print("NewsData API error:", e)
+                pass
+
+    # Fallback to free, real-time news articles from an open-source mirror using general categories
+    url = "https://saurav.tech/NewsAPI/top-headlines/category/business/in.json"
+    
     async with httpx.AsyncClient() as client:
-        response = await client.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-    return data.get("articles", [])
+        try:
+            response = await client.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            articles = data.get("articles", [])
+            return articles[:limit]
+        except Exception as e:
+            print("Fallback error:", e)
+            pass
+            
+    return []
 
 
 # ─── Sentiment Analysis (LLM via Gemini / OpenAI) ────────────────────────────
@@ -38,7 +74,7 @@ async def analyse_sentiment(text: str) -> dict:
         import google.generativeai as genai  # type: ignore
 
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-pro")
+        model = genai.GenerativeModel("gemini-flash-latest")
 
         prompt = (
             "Analyse the sentiment of the following financial news headline/snippet. "

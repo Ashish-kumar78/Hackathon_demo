@@ -5,7 +5,7 @@
 
 const API = (() => {
     // ── Config ────────────────────────────────────────────────────
-    const BASE_URL = 'http://localhost:8000';   // ← change if backend runs elsewhere
+    const BASE_URL = 'http://127.0.0.1:8000';   // ← consistent local IP
 
     // ── Helpers ───────────────────────────────────────────────────
     function getToken() {
@@ -17,8 +17,8 @@ const API = (() => {
         if (useAuth && getToken()) {
             headers['Authorization'] = `Bearer ${getToken()}`;
         }
-        const opts = { 
-            method, 
+        const opts = {
+            method,
             headers,
             mode: 'cors'  // Explicitly enable CORS
         };
@@ -101,6 +101,14 @@ const API = (() => {
         return request('POST', '/api/advisor/ask', { user_id, query });
     }
 
+    async function chat(message, user_id = 0) {
+        return request('POST', '/api/advisor/chat', { message, user_id });
+    }
+
+    async function predictInsight(ticker, days = 7) {
+        return request('POST', `/api/advisor/predict-insight?ticker=${ticker}&days=${days}`);
+    }
+
     // ── Public API surface ────────────────────────────────────────
     return {
         BASE_URL,
@@ -117,21 +125,30 @@ const API = (() => {
         getTickers,
         getNews,
         askAdvisor,
+        chat,
+        predictInsight,
     };
 })();
 
 /* ── Backend Status Check ──────────────────────────────────────── */
 let BACKEND_ONLINE = false;
 
-async function checkBackendStatus() {
-    try {
-        await API.ping();
-        BACKEND_ONLINE = true;
-        console.log('%c✅ MindVest Backend: ONLINE', 'color:#00ff99;font-weight:bold;');
-    } catch {
-        BACKEND_ONLINE = false;
-        console.warn('%c⚠️ MindVest Backend: OFFLINE – running in demo mode', 'color:#f59e0b;font-weight:bold;');
+async function checkBackendStatus(retries = 3) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            await API.ping();
+            BACKEND_ONLINE = true;
+            console.log('%c✅ MindVest Backend: ONLINE', 'color:#00ff99;font-weight:bold;');
+            return;
+        } catch (err) {
+            console.log(`Backend check attempt ${i + 1}/${retries} failed:`, err.message);
+            if (i < retries - 1) {
+                await new Promise(r => setTimeout(r, 1000)); // Wait 1 second before retry
+            }
+        }
     }
+    BACKEND_ONLINE = false;
+    console.warn('%c⚠️ MindVest Backend: OFFLINE – running in demo mode', 'color:#f59e0b;font-weight:bold;');
 }
 
 // Check on page load

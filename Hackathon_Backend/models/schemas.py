@@ -14,6 +14,9 @@ class UserRegister(BaseModel):
     password: str
     full_name: Optional[str] = None
 
+class RegisterResponse(BaseModel):
+    message: str = "Account created successfully! Please sign in."
+
 
 class UserLogin(BaseModel):
     email: EmailStr

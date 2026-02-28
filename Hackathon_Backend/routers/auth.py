@@ -4,7 +4,7 @@ routers/auth.py - Authentication Routes (JWT + Web3)
 
 from fastapi import APIRouter, HTTPException, status
 from datetime import datetime, timedelta
-from models.schemas import UserRegister, UserLogin, WalletLogin, TokenResponse, UserOut
+from models.schemas import UserRegister, UserLogin, WalletLogin, TokenResponse, UserOut, RegisterResponse
 from core.config import settings
 from core.security import hash_password, verify_password, create_access_token
 
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/auth", tags=["Auth"])
 _USERS: dict = {}
 
 
-@router.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 async def register(user: UserRegister):
     """Register a new user with email + password."""
     if user.email in _USERS:

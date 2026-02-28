@@ -21,10 +21,26 @@ def _get_llm_response(prompt: str) -> str:
         import google.generativeai as genai  # type: ignore
 
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-pro")
+        model = genai.GenerativeModel("gemini-flash-latest")
         result = model.generate_content(prompt)
         return result.text
     except Exception as e:
+        if "429" in str(e) or "Resource has been exhausted" in str(e) or "Quota" in str(e):
+            import urllib.request, json
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={settings.GEMINI_API_KEY}"
+            if "key=" not in url or settings.GEMINI_API_KEY == "":
+                return "[AI unavailable: API Key missing in environment]"
+            headers = {'Content-Type': 'application/json'}
+            data = {"contents": [{"parts":[{"text": prompt}]}]}
+            try:
+                req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers)
+                with urllib.request.urlopen(req) as response:
+                    res_data = json.loads(response.read().decode())
+                    return res_data['candidates'][0]['content']['parts'][0]['text']
+            except Exception as e2:
+                if "429" in str(e2):
+                    return "I'm currently receiving too many requests! Google's Free AI tier has a strict rate limit (15 requests/minute). Please wait 1 minute and try your prediction/request again. ⏳"
+                return f"[AI fallback unavailable: {e2}]"
         return f"[LLM unavailable: {e}]"
 
 

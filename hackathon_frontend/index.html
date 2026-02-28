@@ -273,6 +273,15 @@
               <button class="btn-sm" onclick="showAddWatchlist()">+ Add</button>
             </div>
             <div id="watchlist-items">
+              <div class="watch-item" onclick="loadStock('BTC-USD')">
+                <div class="watch-info">
+                  <span class="watch-symbol">BTC-USD</span>
+                  <span class="watch-name">Bitcoin LIVE (24/7)</span>
+                </div>
+                <div class="watch-price positive">
+                  <span>61,000</span><span class="watch-chg">+0.8%</span>
+                </div>
+              </div>
               <div class="watch-item" onclick="loadStock('RELIANCE')">
                 <div class="watch-info">
                   <span class="watch-symbol">RELIANCE</span>
@@ -341,6 +350,10 @@
                 </div>
               </div>
               <div class="chart-tools">
+                <button class="tool-btn" onclick="handleTrade('buy')"
+                  style="background:var(--accent-green);color:#13161f;font-weight:600;padding:4px 12px;border-radius:4px;margin-right:4px;">Long</button>
+                <button class="tool-btn" onclick="handleTrade('sell')"
+                  style="background:var(--accent-red);color:#fff;font-weight:600;padding:4px 12px;border-radius:4px;margin-right:12px;">Short</button>
                 <button class="tool-btn active" onclick="setChartType('line', this)" title="Line">〰</button>
                 <button class="tool-btn" onclick="setChartType('bar', this)" title="Bar">▮▮</button>
                 <button class="tool-btn" onclick="setChartType('candlestick', this)" title="Candlestick"
@@ -453,12 +466,13 @@
               <span class="topic-xp">+75 XP</span>
             </div>
           </div>
+
           <div class="topic-card" onclick="openTopic('options')">
             <div class="topic-icon">🎯</div>
             <h4>Options & Derivatives</h4>
             <p>Call/Put options, Greeks, hedging strategies</p>
             <div class="topic-meta">
-              <span class="topic-badge locked">🔒 Locked</span>
+              <span class="topic-badge inprogress">Start Learning</span>
               <span class="topic-xp">+150 XP</span>
             </div>
           </div>
@@ -467,7 +481,7 @@
             <h4>Crypto & Web3</h4>
             <p>DeFi, blockchain investing, NFTs</p>
             <div class="topic-meta">
-              <span class="topic-badge locked">🔒 Locked</span>
+              <span class="topic-badge inprogress">Start Learning</span>
               <span class="topic-xp">+200 XP</span>
             </div>
           </div>
@@ -499,7 +513,8 @@
               <div class="risk-question" id="rq-1">
                 <p class="rq-text">1. How long is your investment horizon?</p>
                 <div class="rq-options">
-                  <label class="rq-opt"><input type="radio" name="rq1" value="1"> Less than 1 year (Short-term)</label>
+                  <label class="rq-opt"><input type="radio" name="rq1" value="1"> Less than 1 year
+                    (Short-term)</label>
                   <label class="rq-opt"><input type="radio" name="rq1" value="3"> 1–3 years (Medium-term)</label>
                   <label class="rq-opt"><input type="radio" name="rq1" value="5"> 3+ years (Long-term)</label>
                 </div>
@@ -721,7 +736,8 @@
           <div class="panel-header">
             <h3>AI Prediction vs Historical</h3>
             <div class="chart-legend">
-              <span class="legend-item"><span class="legend-dot" style="background:#00ff99"></span> Actual Price</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#00ff99"></span> Actual
+                Price</span>
               <span class="legend-item"><span class="legend-dot" style="background:#6366f1;opacity:0.8"></span> AI
                 Predicted</span>
               <span class="legend-item"><span class="legend-dot" style="background:#f59e0b;opacity:0.6"></span>
@@ -789,6 +805,9 @@
           </div>
         </div>
 
+        <!-- Drastic Event Alert Container inside News Module -->
+        <div id="news-drastic-alert-container" style="margin-bottom: 16px;"></div>
+
         <!-- News Feed -->
         <div class="news-grid">
           <div class="panel news-feed-panel">
@@ -798,7 +817,8 @@
                 <input type="text" id="news-query-input" placeholder="Search: RELIANCE, crypto, RBI…"
                   style="flex:1;padding:6px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:12px"
                   value="India stock market" />
-                <button class="btn-sm" onclick="loadNewsItems('all')" style="white-space:nowrap">🔍 Fetch Live</button>
+                <button class="btn-sm" onclick="loadNewsItems('all')" style="white-space:nowrap">🔍 Fetch
+                  Live</button>
               </div>
               <select id="news-filter" onchange="filterNews(this.value)" class="small-select">
                 <option value="all">All</option>
@@ -918,7 +938,8 @@
                 <div class="strategy-icon">🛡️</div>
                 <div class="strategy-content">
                   <h4>Add Defensive Buffer</h4>
-                  <p>Portfolio lacks defensive assets. Adding FMCG or Pharma exposure (10%) will improve diversification
+                  <p>Portfolio lacks defensive assets. Adding FMCG or Pharma exposure (10%) will improve
+                    diversification
                     score from 72 → 85.</p>
                   <div class="strategy-action">
                     <span class="action-tag">DIVERSIFY</span>
@@ -1263,15 +1284,41 @@
   <!-- 3D Neon Candlestick Background — like the VJ Loop video -->
   <script src="trading-bg.js"></script>
 
+  <!-- 🤖 AI Assistant Floating Chatbot -->
+  <div id="ai-chatbot" class="ai-chat-container closed">
+    <div class="chat-header" onclick="toggleChatbot()">
+      <div class="chat-header-left">
+        <div class="chat-bot-icon">🤖</div>
+        <div class="chat-header-info">
+          <span class="chat-title">MindVest AI</span>
+          <span class="chat-status">🟢 Online</span>
+        </div>
+      </div>
+      <button class="chat-toggle-btn">✕</button>
+    </div>
+    <div class="chat-messages" id="chat-messages">
+      <div class="msg bot">
+        Hello! I am your AI financial advisor. How can I help you with your investments today?
+      </div>
+    </div>
+    <div class="chat-input-area">
+      <input type="text" id="chat-input" placeholder="Ask about stocks, strategy..."
+        onkeypress="if(event.key==='Enter') sendChatMessage()" />
+      <button id="chat-send-btn" onclick="sendChatMessage()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="chat-trigger" class="chat-trigger" onclick="toggleChatbot()">
+    <div class="trigger-icon">🤖</div>
+    <div class="trigger-label">Ask AI</div>
+  </div>
+
   <script src="app.js"></script>
-</body>
-
-</html>
-
-
-</script>
-
-<script src="app.js"></script>
 </body>
 
 </html>

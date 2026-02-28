@@ -32,7 +32,7 @@ const State = {
    ══════════════════════════════════════════════ */
 const API_CONFIG = {
     // 🔑 Paste your free Alpha Vantage key here → https://www.alphavantage.co/support/#api-key
-    KEY: '51SRKXZ79LFSGXUI',
+    KEY: 'YOUR_API_KEY_HERE',
     BASE: 'https://www.alphavantage.co/query',
     // Map our symbol names to Alpha Vantage BSE symbols
     SYMBOL_MAP: {

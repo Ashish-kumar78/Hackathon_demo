@@ -35,9 +35,19 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
 
 
+import os
+from dotenv import load_dotenv
+
+# Load .env explicitly
+load_dotenv()
+
 @lru_cache()
 def get_settings() -> Settings:
-    return Settings()
-
+    # Set the loaded OS env variables directly into settings
+    return Settings(
+        GEMINI_API_KEY=os.getenv("GEMINI_API_KEY", ""),
+        OPENAI_API_KEY=os.getenv("OPENAI_API_KEY", ""),
+        NEWS_API_KEY=os.getenv("NEWS_API_KEY", "")
+    )
 
 settings = get_settings()
