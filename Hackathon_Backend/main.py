@@ -62,4 +62,4 @@ async def serve_index():
 
 @app.get("/health", tags=["Health"])
 async def health_check():
-    return {"status": "ok", "version": "1.0.0"}
+    return {"status": "ok", "version": "1.0.0", "frontend": "enabled"}
