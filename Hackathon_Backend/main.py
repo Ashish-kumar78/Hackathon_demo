@@ -39,27 +39,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Static Files (Frontend) ────────────────────────────────────────────────
-# Serve frontend files from root
-app.mount("/static", StaticFiles(directory="."), name="static")
-
-# Mount individual files for direct access
-@app.get("/style.css")
-async def serve_css():
-    return FileResponse("style.css")
-
-@app.get("/api.js")
-async def serve_api_js():
-    return FileResponse("api.js")
-
-@app.get("/app.js")
-async def serve_app_js():
-    return FileResponse("app.js")
-
-@app.get("/trading-bg.js")
-async def serve_trading_bg_js():
-    return FileResponse("trading-bg.js")
-
 # ── Routers ─────────────────────────────────────────────────────────────────
 app.include_router(auth.router)
 app.include_router(learning.router)
@@ -69,14 +48,11 @@ app.include_router(news.router)
 app.include_router(advisor.router)
 app.include_router(market.router)
 
-
-# ── Frontend Routes ─────────────────────────────────────────────────────────
-@app.get("/")
-async def serve_index():
-    """Serve the main frontend HTML file"""
-    return FileResponse("index.html")
-
-
-@app.get("/health", tags=["Health"])
+# ── Health Endpoint ─────────────────────────────────────────────────────────
+@app.get("/health")
 async def health_check():
-    return {"status": "ok", "version": "1.0.0", "frontend": "enabled"}
+    return {"status": "ok", "version": "1.0.0"}
+
+# ── Static Files (Frontend) ────────────────────────────────────────────────
+# Serve static files from root directory (must be after API routes)
+app.mount("/", StaticFiles(directory=".", html=True), name="static")
