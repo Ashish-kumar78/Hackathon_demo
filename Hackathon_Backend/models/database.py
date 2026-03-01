@@ -3,21 +3,20 @@ models/database.py - SQLAlchemy / Supabase Setup (lazy & safe)
 """
 
 from core.config import settings
+from sqlalchemy.ext.declarative import declarative_base
 
 # --- SQLAlchemy (optional; only initialised if DATABASE_URL is set) ---
 engine = None
 SessionLocal = None
-Base = None
+Base = declarative_base()  # Always create Base, even if DB not configured
 
 if settings.DATABASE_URL:
     try:
         from sqlalchemy import create_engine
-        from sqlalchemy.ext.declarative import declarative_base
         from sqlalchemy.orm import sessionmaker
 
         engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        Base = declarative_base()
     except Exception as e:
         print(f"[DB] SQLAlchemy init skipped: {e}")
 
