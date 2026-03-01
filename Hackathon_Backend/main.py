@@ -4,6 +4,9 @@ MindVest Backend - Entry Point & FastAPI Configuration
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
 
 from routers import auth, learning, investment, prediction, news, advisor, market
 from models.database import engine, Base
@@ -36,6 +39,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Static Files (Frontend) ────────────────────────────────────────────────
+# Serve frontend files from root
+app.mount("/static", StaticFiles(directory="."), name="static")
+
 # ── Routers ─────────────────────────────────────────────────────────────────
 app.include_router(auth.router)
 app.include_router(learning.router)
@@ -46,11 +53,11 @@ app.include_router(advisor.router)
 app.include_router(market.router)
 
 
-# ── Health Endpoints ─────────────────────────────────────────────────────────
-
-@app.get("/", tags=["Health"])
-async def root():
-    return {"message": "MindVest API is running 🚀"}
+# ── Frontend Routes ─────────────────────────────────────────────────────────
+@app.get("/")
+async def serve_index():
+    """Serve the main frontend HTML file"""
+    return FileResponse("index.html")
 
 
 @app.get("/health", tags=["Health"])
