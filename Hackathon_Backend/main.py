@@ -54,5 +54,25 @@ async def health_check():
     return {"status": "ok", "version": "1.0.0"}
 
 # ── Static Files (Frontend) ────────────────────────────────────────────────
-# Serve static files from root directory (must be after API routes)
-app.mount("/", StaticFiles(directory=".", html=True), name="static")
+# Serve frontend HTML
+@app.get("/")
+async def serve_index():
+    return FileResponse("index.html")
+
+# Serve CSS
+@app.get("/style.css")
+async def serve_css():
+    return FileResponse("style.css")
+
+# Serve JS files
+@app.get("/api.js")
+async def serve_api_js():
+    return FileResponse("api.js")
+
+@app.get("/app.js")
+async def serve_app_js():
+    return FileResponse("app.js")
+
+@app.get("/trading-bg.js")
+async def serve_trading_bg_js():
+    return FileResponse("trading-bg.js")
