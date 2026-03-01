@@ -66,7 +66,7 @@ async function fetchAlphaVantage(symbol, timeframe) {
     }
 
     try {
-        const url = `http://127.0.0.1:8000/api/market/chart?symbol=${symbol}&timeframe=${timeframe}`;
+        const url = `https://mindvest-api.onrender.com/api/market/chart?symbol=${symbol}&timeframe=${timeframe}`;
         const res = await fetch(url);
 
         if (!res.ok) {
@@ -1760,7 +1760,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Live Ticker using real Market API
     async function updateLiveTicker() {
         try {
-            const res = await fetch('http://127.0.0.1:8000/api/market/quotes');
+            const res = await fetch('https://mindvest-api.onrender.com/api/market/quotes');
             if (!res.ok) return;
             const data = await res.json();
 
@@ -1868,7 +1868,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(async () => {
         if (!currentStock || !BACKEND_ONLINE) return;
         try {
-            const res = await fetch(`http://127.0.0.1:8000/api/market/quotes?symbols=${currentStock}.NS`);
+            const res = await fetch(`https://mindvest-api.onrender.com/api/market/quotes?symbols=${currentStock}.NS`);
             if (!res.ok) return;
             const data = await res.json();
             const info = data[currentStock];

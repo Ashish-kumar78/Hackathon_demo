@@ -5,7 +5,7 @@
 
 const API = (() => {
     // ── Config ────────────────────────────────────────────────────
-    const BASE_URL = 'http://127.0.0.1:8000';   // ← consistent local IP
+    const BASE_URL = 'https://mindvest-api.onrender.com';   // ← Live API
 
     // ── Helpers ───────────────────────────────────────────────────
     function getToken() {
