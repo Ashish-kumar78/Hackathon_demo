@@ -43,6 +43,23 @@ app.add_middleware(
 # Serve frontend files from root
 app.mount("/static", StaticFiles(directory="."), name="static")
 
+# Mount individual files for direct access
+@app.get("/style.css")
+async def serve_css():
+    return FileResponse("style.css")
+
+@app.get("/api.js")
+async def serve_api_js():
+    return FileResponse("api.js")
+
+@app.get("/app.js")
+async def serve_app_js():
+    return FileResponse("app.js")
+
+@app.get("/trading-bg.js")
+async def serve_trading_bg_js():
+    return FileResponse("trading-bg.js")
+
 # ── Routers ─────────────────────────────────────────────────────────────────
 app.include_router(auth.router)
 app.include_router(learning.router)
