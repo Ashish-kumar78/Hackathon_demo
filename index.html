@@ -18,6 +18,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@0.1.1/dist/chartjs-chart-financial.js"></script>
   <link rel="stylesheet" href="style.css" />
+  <script src="api.js"></script>
 </head>
 
 <body>
@@ -26,12 +27,9 @@
   <!-- ║          AUTH SCREEN (Login)             ║ -->
   <!-- ╚══════════════════════════════════════════╝ -->
   <div id="auth-screen" class="auth-screen">
-    <div class="auth-bg-grid"></div>
-    <div class="auth-orbs">
-      <div class="orb orb-1"></div>
-      <div class="orb orb-2"></div>
-      <div class="orb orb-3"></div>
-    </div>
+    <!-- 3D Trading Canvas Background -->
+    <canvas id="trading-bg-canvas"
+      style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;"></canvas>
     <div class="auth-card">
       <div class="auth-logo">
         <div class="logo-icon">⚡</div>
@@ -174,6 +172,29 @@
           </svg>
           <span>AI Advisor</span>
         </button>
+        <button class="sidebar-btn" id="nav-journal" onclick="switchTab('journal')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path
+              d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2h11A2.5 2.5 0 0 1 22 7.5v15a2.5 2.5 0 0 1-2.5 2.5H6.5A2.5 2.5 0 0 1 4 19.5z">
+            </path>
+          </svg>
+          <span>Trade Journal</span>
+        </button>
+        <button class="sidebar-btn" id="nav-calculators" onclick="switchTab('calculators')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+            <line x1="8" y1="6" x2="16" y2="6"></line>
+            <line x1="16" y1="14" x2="16" y2="14"></line>
+            <line x1="8" y1="10" x2="8" y2="10"></line>
+            <line x1="16" y1="10" x2="16" y2="10"></line>
+            <line x1="8" y1="14" x2="8" y2="14"></line>
+            <line x1="12" y1="14" x2="12" y2="14"></line>
+            <line x1="8" y1="18" x2="8" y2="18"></line>
+            <line x1="16" y1="18" x2="16" y2="18"></line>
+            <line x1="12" y1="18" x2="12" y2="18"></line>
+          </svg>
+          <span>Calculators</span>
+        </button>
       </nav>
       <div class="sidebar-bottom">
         <div class="sidebar-security-badge">
@@ -252,6 +273,15 @@
               <button class="btn-sm" onclick="showAddWatchlist()">+ Add</button>
             </div>
             <div id="watchlist-items">
+              <div class="watch-item" onclick="loadStock('BTC-USD')">
+                <div class="watch-info">
+                  <span class="watch-symbol">BTC-USD</span>
+                  <span class="watch-name">Bitcoin LIVE (24/7)</span>
+                </div>
+                <div class="watch-price positive">
+                  <span>61,000</span><span class="watch-chg">+0.8%</span>
+                </div>
+              </div>
               <div class="watch-item" onclick="loadStock('RELIANCE')">
                 <div class="watch-info">
                   <span class="watch-symbol">RELIANCE</span>
@@ -320,6 +350,10 @@
                 </div>
               </div>
               <div class="chart-tools">
+                <button class="tool-btn" onclick="handleTrade('buy')"
+                  style="background:var(--accent-green);color:#13161f;font-weight:600;padding:4px 12px;border-radius:4px;margin-right:4px;">Long</button>
+                <button class="tool-btn" onclick="handleTrade('sell')"
+                  style="background:var(--accent-red);color:#fff;font-weight:600;padding:4px 12px;border-radius:4px;margin-right:12px;">Short</button>
                 <button class="tool-btn active" onclick="setChartType('line', this)" title="Line">〰</button>
                 <button class="tool-btn" onclick="setChartType('bar', this)" title="Bar">▮▮</button>
                 <button class="tool-btn" onclick="setChartType('candlestick', this)" title="Candlestick"
@@ -432,12 +466,13 @@
               <span class="topic-xp">+75 XP</span>
             </div>
           </div>
+
           <div class="topic-card" onclick="openTopic('options')">
             <div class="topic-icon">🎯</div>
             <h4>Options & Derivatives</h4>
             <p>Call/Put options, Greeks, hedging strategies</p>
             <div class="topic-meta">
-              <span class="topic-badge locked">🔒 Locked</span>
+              <span class="topic-badge inprogress">Start Learning</span>
               <span class="topic-xp">+150 XP</span>
             </div>
           </div>
@@ -446,7 +481,7 @@
             <h4>Crypto & Web3</h4>
             <p>DeFi, blockchain investing, NFTs</p>
             <div class="topic-meta">
-              <span class="topic-badge locked">🔒 Locked</span>
+              <span class="topic-badge inprogress">Start Learning</span>
               <span class="topic-xp">+200 XP</span>
             </div>
           </div>
@@ -478,7 +513,8 @@
               <div class="risk-question" id="rq-1">
                 <p class="rq-text">1. How long is your investment horizon?</p>
                 <div class="rq-options">
-                  <label class="rq-opt"><input type="radio" name="rq1" value="1"> Less than 1 year (Short-term)</label>
+                  <label class="rq-opt"><input type="radio" name="rq1" value="1"> Less than 1 year
+                    (Short-term)</label>
                   <label class="rq-opt"><input type="radio" name="rq1" value="3"> 1–3 years (Medium-term)</label>
                   <label class="rq-opt"><input type="radio" name="rq1" value="5"> 3+ years (Long-term)</label>
                 </div>
@@ -700,7 +736,8 @@
           <div class="panel-header">
             <h3>AI Prediction vs Historical</h3>
             <div class="chart-legend">
-              <span class="legend-item"><span class="legend-dot" style="background:#00ff99"></span> Actual Price</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#00ff99"></span> Actual
+                Price</span>
               <span class="legend-item"><span class="legend-dot" style="background:#6366f1;opacity:0.8"></span> AI
                 Predicted</span>
               <span class="legend-item"><span class="legend-dot" style="background:#f59e0b;opacity:0.6"></span>
@@ -768,11 +805,21 @@
           </div>
         </div>
 
+        <!-- Drastic Event Alert Container inside News Module -->
+        <div id="news-drastic-alert-container" style="margin-bottom: 16px;"></div>
+
         <!-- News Feed -->
         <div class="news-grid">
           <div class="panel news-feed-panel">
-            <div class="panel-header">
+            <div class="panel-header" style="flex-wrap:wrap;gap:8px">
               <h3>Latest News</h3>
+              <div style="display:flex;gap:8px;align-items:center;flex:1;min-width:200px">
+                <input type="text" id="news-query-input" placeholder="Search: RELIANCE, crypto, RBI…"
+                  style="flex:1;padding:6px 10px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:12px"
+                  value="India stock market" />
+                <button class="btn-sm" onclick="loadNewsItems('all')" style="white-space:nowrap">🔍 Fetch
+                  Live</button>
+              </div>
               <select id="news-filter" onchange="filterNews(this.value)" class="small-select">
                 <option value="all">All</option>
                 <option value="positive">Positive</option>
@@ -891,7 +938,8 @@
                 <div class="strategy-icon">🛡️</div>
                 <div class="strategy-content">
                   <h4>Add Defensive Buffer</h4>
-                  <p>Portfolio lacks defensive assets. Adding FMCG or Pharma exposure (10%) will improve diversification
+                  <p>Portfolio lacks defensive assets. Adding FMCG or Pharma exposure (10%) will improve
+                    diversification
                     score from 72 → 85.</p>
                   <div class="strategy-action">
                     <span class="action-tag">DIVERSIFY</span>
@@ -986,6 +1034,185 @@
         </div>
       </div>
 
+      <!-- ════════════════════════════════════ -->
+      <!-- TAB: TRADE JOURNAL                   -->
+      <!-- ════════════════════════════════════ -->
+      <div id="tab-journal" class="tab-pane hidden">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">📓 Trade Journal</h2>
+            <p class="page-sub">Log, track and review your past trades</p>
+          </div>
+          <button class="btn-primary" onclick="openAddTradeModal()">+ Record Trade</button>
+        </div>
+
+        <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr);">
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background:rgba(0,255,153,0.1);color:#00ff99">📈</div>
+            <div>
+              <div class="kpi-label">Win Rate</div>
+              <div class="kpi-value" id="jnl-win-rate">0%</div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background:rgba(99,102,241,0.1);color:#6366f1">💰</div>
+            <div>
+              <div class="kpi-label">Total Realized P&L</div>
+              <div class="kpi-value" id="jnl-total-pnl">₹0</div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background:rgba(245,158,11,0.1);color:#f59e0b">📊</div>
+            <div>
+              <div class="kpi-label">Total Trades</div>
+              <div class="kpi-value" id="jnl-total-trades">0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:16px">
+          <div class="panel-header">
+            <h3>Trade History</h3>
+          </div>
+          <table class="holdings-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Symbol</th>
+                <th>Type</th>
+                <th>Entry Price</th>
+                <th>Exit Price</th>
+                <th>Qty</th>
+                <th>P&L</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="journal-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════ -->
+      <!-- TAB: CALCULATORS                     -->
+      <!-- ════════════════════════════════════ -->
+      <div id="tab-calculators" class="tab-pane hidden">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">🧮 Financial Calculators</h2>
+            <p class="page-sub">Plan your SIP, SWP, FD & Lumpsum Investments</p>
+          </div>
+          <div class="timeframe-btns">
+            <button class="tf-btn active" id="calc-tab-sip" onclick="switchCalculator('sip')">SIP</button>
+            <button class="tf-btn" id="calc-tab-swp" onclick="switchCalculator('swp')">SWP</button>
+            <button class="tf-btn" id="calc-tab-lumpsum" onclick="switchCalculator('lumpsum')">MF / Lumpsum</button>
+            <button class="tf-btn" id="calc-tab-fd" onclick="switchCalculator('fd')">FD</button>
+          </div>
+        </div>
+
+        <div class="calculator-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <!-- Controls -->
+          <div class="panel">
+            <div id="calc-sip" class="calc-section">
+              <h3 class="panel-title">SIP Calculator</h3>
+              <div class="form-group">
+                <label>Monthly Investment (₹)</label>
+                <input type="number" id="sip-amount" value="10000" oninput="calculateReturns('sip')" />
+              </div>
+              <div class="form-group">
+                <label>Expected Return Rate (p.a %)</label>
+                <input type="number" id="sip-rate" value="12" step="0.5" oninput="calculateReturns('sip')" />
+              </div>
+              <div class="form-group">
+                <label>Time Period (Years)</label>
+                <input type="number" id="sip-years" value="10" oninput="calculateReturns('sip')" />
+              </div>
+            </div>
+
+            <div id="calc-swp" class="calc-section hidden">
+              <h3 class="panel-title">SWP Calculator</h3>
+              <div class="form-group">
+                <label>Total Investment (₹)</label>
+                <input type="number" id="swp-amount" value="5000000" oninput="calculateReturns('swp')" />
+              </div>
+              <div class="form-group">
+                <label>Withdrawal per month (₹)</label>
+                <input type="number" id="swp-withdraw" value="25000" oninput="calculateReturns('swp')" />
+              </div>
+              <div class="form-group">
+                <label>Expected Return Rate (p.a %)</label>
+                <input type="number" id="swp-rate" value="10" step="0.5" oninput="calculateReturns('swp')" />
+              </div>
+              <div class="form-group">
+                <label>Time Period (Years)</label>
+                <input type="number" id="swp-years" value="10" oninput="calculateReturns('swp')" />
+              </div>
+            </div>
+
+            <div id="calc-lumpsum" class="calc-section hidden">
+              <h3 class="panel-title">Mutual Fund / Lumpsum Calculator</h3>
+              <div class="form-group">
+                <label>Total Investment (₹)</label>
+                <input type="number" id="lump-amount" value="500000" oninput="calculateReturns('lumpsum')" />
+              </div>
+              <div class="form-group">
+                <label>Expected Return Rate (p.a %)</label>
+                <input type="number" id="lump-rate" value="12" step="0.5" oninput="calculateReturns('lumpsum')" />
+              </div>
+              <div class="form-group">
+                <label>Time Period (Years)</label>
+                <input type="number" id="lump-years" value="5" oninput="calculateReturns('lumpsum')" />
+              </div>
+            </div>
+
+            <div id="calc-fd" class="calc-section hidden">
+              <h3 class="panel-title">FD Calculator</h3>
+              <div class="form-group">
+                <label>Total Investment (₹)</label>
+                <input type="number" id="fd-amount" value="500000" oninput="calculateReturns('fd')" />
+              </div>
+              <div class="form-group">
+                <label>Rate of Interest (p.a %)</label>
+                <input type="number" id="fd-rate" value="7" step="0.5" oninput="calculateReturns('fd')" />
+              </div>
+              <div class="form-group">
+                <label>Time Period (Years)</label>
+                <input type="number" id="fd-years" value="5" oninput="calculateReturns('fd')" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Chart and Results -->
+          <div class="panel">
+            <h3 class="panel-title" id="calc-chart-title">SIP Returns</h3>
+
+            <div style="height:250px;position:relative;width:100%;margin-bottom:20px;">
+              <canvas id="calculator-chart"></canvas>
+            </div>
+
+            <div class="kpi-grid" style="grid-template-columns: 1fr; gap: 8px;">
+              <div
+                style="display:flex; justify-content: space-between; padding: 12px; background: rgba(99,102,241,0.05); border: 1px solid rgba(99,102,241,0.2); border-radius: var(--radius-sm);">
+                <span class="text-secondary" id="lbl-invested">Invested Amount</span>
+                <strong class="font-mono text-primary" id="val-invested">₹0</strong>
+              </div>
+              <div
+                style="display:flex; justify-content: space-between; padding: 12px; background: rgba(0,255,153,0.05); border: 1px solid rgba(0,255,153,0.2); border-radius: var(--radius-sm);">
+                <span class="text-secondary" id="lbl-returns">Est. Returns</span>
+                <strong class="font-mono positive" id="val-returns">₹0</strong>
+              </div>
+              <div
+                style="display:flex; justify-content: space-between; padding: 12px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm);">
+                <span class="text-secondary" id="lbl-total">Total Value</span>
+                <strong class="font-mono text-primary" id="val-total" style="font-size: 16px;">₹0</strong>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
     </main>
   </div>
 
@@ -1006,6 +1233,89 @@
         <button class="btn-primary" onclick="markTopicDone()">Mark Complete ✓</button>
       </div>
     </div>
+  </div>
+
+  <!-- Add Trade Modal -->
+  <div id="add-trade-modal" class="modal hidden">
+    <div class="modal-overlay" onclick="closeAddTradeModal()"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Record Trade</h3>
+        <button class="modal-close" onclick="closeAddTradeModal()">✕</button>
+      </div>
+      <div class="form-group">
+        <label>Symbol</label>
+        <input type="text" id="trade-symbol" placeholder="e.g., RELIANCE" />
+      </div>
+      <div class="form-group" style="display:flex;gap:12px">
+        <div style="flex:1">
+          <label>Type</label>
+          <select id="trade-type">
+            <option value="LONG">Long (Buy)</option>
+            <option value="SHORT">Short (Sell)</option>
+          </select>
+        </div>
+        <div style="flex:1">
+          <label>Quantity</label>
+          <input type="number" id="trade-qty" placeholder="Units" min="1" />
+        </div>
+      </div>
+      <div class="form-group" style="display:flex;gap:12px">
+        <div style="flex:1">
+          <label>Entry Price</label>
+          <input type="number" id="trade-entry" placeholder="₹" min="0" />
+        </div>
+        <div style="flex:1">
+          <label>Exit Price</label>
+          <input type="number" id="trade-exit" placeholder="₹" min="0" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notes (Optional)</label>
+        <input type="text" id="trade-notes" placeholder="Why did you take this trade?" />
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeAddTradeModal()">Cancel</button>
+        <button class="btn-primary" onclick="addTrade()">Save Trade</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3D Neon Candlestick Background — like the VJ Loop video -->
+  <script src="trading-bg.js"></script>
+
+  <!-- 🤖 AI Assistant Floating Chatbot -->
+  <div id="ai-chatbot" class="ai-chat-container closed">
+    <div class="chat-header" onclick="toggleChatbot()">
+      <div class="chat-header-left">
+        <div class="chat-bot-icon">🤖</div>
+        <div class="chat-header-info">
+          <span class="chat-title">MindVest AI</span>
+          <span class="chat-status">🟢 Online</span>
+        </div>
+      </div>
+      <button class="chat-toggle-btn">✕</button>
+    </div>
+    <div class="chat-messages" id="chat-messages">
+      <div class="msg bot">
+        Hello! I am your AI financial advisor. How can I help you with your investments today?
+      </div>
+    </div>
+    <div class="chat-input-area">
+      <input type="text" id="chat-input" placeholder="Ask about stocks, strategy..."
+        onkeypress="if(event.key==='Enter') sendChatMessage()" />
+      <button id="chat-send-btn" onclick="sendChatMessage()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="chat-trigger" class="chat-trigger" onclick="toggleChatbot()">
+    <div class="trigger-icon">🤖</div>
+    <div class="trigger-label">Ask AI</div>
   </div>
 
   <script src="app.js"></script>
